@@ -225,26 +225,34 @@ export function POSSystem() {
       status: 'completed',
     };
 
-    const completedSale = addSale(sale as Omit<Sale, 'id'>);
-    
-    // Log the sale activity
-    ActivityLogger.sale(
-      completedSale.id, 
-      total, 
-      cart.reduce((sum, c) => sum + c.quantity, 0)
-    );
-    
-    // Set the last sale for receipt display
-    setLastSale(completedSale);
-    setReceiptNumber(newReceiptNumber);
-    setShowReceipt(true);
-    
-    toast({
-      title: 'Sale Complete!',
-      description: `Transaction successful. Change: ${formatKES(balance)}`,
-    });
+    try {
+      const completedSale = await addSale(sale as Omit<Sale, 'id'>);
+      
+      // Log the sale activity
+      ActivityLogger.sale(
+        completedSale.id, 
+        total, 
+        cart.reduce((sum, c) => sum + c.quantity, 0)
+      );
+      
+      // Set the last sale for receipt display
+      setLastSale(completedSale);
+      setReceiptNumber(newReceiptNumber);
+      setShowReceipt(true);
+      
+      toast({
+        title: 'Sale Complete!',
+        description: `Transaction successful. Change: ${formatKES(balance)}`,
+      });
 
-    clearCart();
+      clearCart();
+    } catch (error: any) {
+      toast({
+        title: 'Sale Failed',
+        description: error.message || 'Could not process sale.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePrintReceipt = () => {
