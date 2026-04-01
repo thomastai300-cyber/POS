@@ -204,36 +204,6 @@ export default function Auth() {
             </form>
           </TabsContent>
 
-          {showForgotPassword && (
-            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-              <Card className="w-full max-w-md p-8">
-                <h2 className="text-xl font-bold text-foreground mb-2">Reset Password</h2>
-                <p className="text-sm text-muted-foreground mb-4">Enter your email and we'll send you a reset link.</p>
-                <form onSubmit={handleForgotPassword} className="space-y-4">
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      type="email"
-                      placeholder="you@example.com"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1 gradient-primary" disabled={isLoading}>
-                      {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                      Send Reset Link
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={() => setShowForgotPassword(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </Card>
-            </div>
-          )
-
           <TabsContent value="signup">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
