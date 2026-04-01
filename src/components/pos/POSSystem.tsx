@@ -182,7 +182,7 @@ export function POSSystem() {
     return `${prefix}${dateStr}${random}`;
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) {
       toast({
         title: 'Empty Cart',
