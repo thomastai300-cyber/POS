@@ -17,8 +17,12 @@ export function StockManagement() {
   const [barcodeItem, setBarcodeItem] = useState<StockItem | null>(null);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   
-  const { items, addItem, updateItem, deleteItem } = useStockStore();
+  const { items, addItem, updateItem, deleteItem, fetchItems } = useStockStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   const filteredItems = useMemo(() => {
     if (!searchTerm) return items;
