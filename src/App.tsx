@@ -16,6 +16,7 @@ import Integrations from "./pages/Integrations";
 import Users from "./pages/Users";
 import ActivityLogs from "./pages/ActivityLogs";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
