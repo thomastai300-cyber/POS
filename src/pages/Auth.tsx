@@ -40,6 +40,27 @@ export default function Auth() {
     confirmPassword: '' 
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      toast({ title: 'Error', description: 'Please enter your email.', variant: 'destructive' });
+      return;
+    }
+    setIsLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setIsLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Check your email', description: 'A password reset link has been sent.' });
+      setShowForgotPassword(false);
+    }
+  };
 
   // Redirect if already logged in
   if (user) {
