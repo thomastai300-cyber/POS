@@ -25,8 +25,12 @@ export function SalesDashboard() {
   const [toDate, setToDate] = useState('');
   const [isFiltered, setIsFiltered] = useState(false);
   
-  const { sales } = useStockStore();
+  const { sales, fetchSales } = useStockStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchSales();
+  }, [fetchSales]);
 
   const filteredSales = useMemo(() => {
     if (!isFiltered || !fromDate || !toDate) return sales;
