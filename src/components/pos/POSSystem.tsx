@@ -38,8 +38,12 @@ export function POSSystem() {
   const [receiptNumber, setReceiptNumber] = useState('');
   
   const receiptRef = useRef<HTMLDivElement>(null);
-  const { items, addSale } = useStockStore();
+  const { items, addSale, fetchItems } = useStockStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   // Barcode scanner integration
   const handleBarcodeScan = useCallback(
