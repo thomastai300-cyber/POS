@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { 
   Search, 
   ShoppingCart, 
@@ -38,8 +38,12 @@ export function POSSystem() {
   const [receiptNumber, setReceiptNumber] = useState('');
   
   const receiptRef = useRef<HTMLDivElement>(null);
-  const { items, addSale } = useStockStore();
+  const { items, addSale, fetchItems } = useStockStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   // Barcode scanner integration
   const handleBarcodeScan = useCallback(
@@ -182,7 +186,7 @@ export function POSSystem() {
     return `${prefix}${dateStr}${random}`;
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) {
       toast({
         title: 'Empty Cart',
@@ -225,26 +229,34 @@ export function POSSystem() {
       status: 'completed',
     };
 
-    const completedSale = addSale(sale as Omit<Sale, 'id'>);
-    
-    // Log the sale activity
-    ActivityLogger.sale(
-      completedSale.id, 
-      total, 
-      cart.reduce((sum, c) => sum + c.quantity, 0)
-    );
-    
-    // Set the last sale for receipt display
-    setLastSale(completedSale);
-    setReceiptNumber(newReceiptNumber);
-    setShowReceipt(true);
-    
-    toast({
-      title: 'Sale Complete!',
-      description: `Transaction successful. Change: ${formatKES(balance)}`,
-    });
+    try {
+      const completedSale = await addSale(sale as Omit<Sale, 'id'>);
+      
+      // Log the sale activity
+      ActivityLogger.sale(
+        completedSale.id, 
+        total, 
+        cart.reduce((sum, c) => sum + c.quantity, 0)
+      );
+      
+      // Set the last sale for receipt display
+      setLastSale(completedSale);
+      setReceiptNumber(newReceiptNumber);
+      setShowReceipt(true);
+      
+      toast({
+        title: 'Sale Complete!',
+        description: `Transaction successful. Change: ${formatKES(balance)}`,
+      });
 
-    clearCart();
+      clearCart();
+    } catch (error: any) {
+      toast({
+        title: 'Sale Failed',
+        description: error.message || 'Could not process sale.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePrintReceipt = () => {

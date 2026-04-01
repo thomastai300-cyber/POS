@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,12 @@ export function StockManagement() {
   const [barcodeItem, setBarcodeItem] = useState<StockItem | null>(null);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   
-  const { items, addItem, updateItem, deleteItem } = useStockStore();
+  const { items, addItem, updateItem, deleteItem, fetchItems } = useStockStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   const filteredItems = useMemo(() => {
     if (!searchTerm) return items;

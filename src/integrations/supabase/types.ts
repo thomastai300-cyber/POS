@@ -113,6 +113,170 @@ export type Database = {
         }
         Relationships: []
       }
+      sale_items: {
+        Row: {
+          id: string
+          item_id: string
+          name: string
+          price: number
+          quantity: number
+          sale_id: string
+          total: number
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          name: string
+          price: number
+          quantity: number
+          sale_id: string
+          total: number
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          name?: string
+          price?: number
+          quantity?: number
+          sale_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          amount_paid: number
+          balance: number
+          created_at: string
+          customer_id: string | null
+          customer_name: string | null
+          date: string
+          discount: number
+          id: string
+          loyalty_points_earned: number | null
+          loyalty_points_redeemed: number | null
+          mpesa_ref: string | null
+          payment_method: string
+          sale_type: string
+          status: string
+          subtotal: number
+          tax: number
+          timestamp: number
+          total: number
+          total_items: number
+          user_id: string
+        }
+        Insert: {
+          amount_paid?: number
+          balance?: number
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          date?: string
+          discount?: number
+          id?: string
+          loyalty_points_earned?: number | null
+          loyalty_points_redeemed?: number | null
+          mpesa_ref?: string | null
+          payment_method?: string
+          sale_type?: string
+          status?: string
+          subtotal?: number
+          tax?: number
+          timestamp?: number
+          total?: number
+          total_items?: number
+          user_id: string
+        }
+        Update: {
+          amount_paid?: number
+          balance?: number
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          date?: string
+          discount?: number
+          id?: string
+          loyalty_points_earned?: number | null
+          loyalty_points_redeemed?: number | null
+          mpesa_ref?: string | null
+          payment_method?: string
+          sale_type?: string
+          status?: string
+          subtotal?: number
+          tax?: number
+          timestamp?: number
+          total?: number
+          total_items?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stock_items: {
+        Row: {
+          barcode: string
+          category: string
+          cost: number
+          created_at: string
+          id: string
+          image: string | null
+          location: string | null
+          low_stock_threshold: number
+          name: string
+          price: number
+          quantity: number
+          subcategory: string | null
+          uom: string
+          updated_at: string
+          user_id: string
+          wholesale_price: number | null
+        }
+        Insert: {
+          barcode?: string
+          category?: string
+          cost?: number
+          created_at?: string
+          id?: string
+          image?: string | null
+          location?: string | null
+          low_stock_threshold?: number
+          name: string
+          price?: number
+          quantity?: number
+          subcategory?: string | null
+          uom?: string
+          updated_at?: string
+          user_id: string
+          wholesale_price?: number | null
+        }
+        Update: {
+          barcode?: string
+          category?: string
+          cost?: number
+          created_at?: string
+          id?: string
+          image?: string | null
+          location?: string | null
+          low_stock_threshold?: number
+          name?: string
+          price?: number
+          quantity?: number
+          subcategory?: string | null
+          uom?: string
+          updated_at?: string
+          user_id?: string
+          wholesale_price?: number | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_at: string

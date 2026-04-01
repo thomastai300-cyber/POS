@@ -16,6 +16,7 @@ import Integrations from "./pages/Integrations";
 import Users from "./pages/Users";
 import ActivityLogs from "./pages/ActivityLogs";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Navigate to="/billing" replace />} />
             <Route path="/stock" element={
               <ProtectedRoute module="stock">
