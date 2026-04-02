@@ -80,15 +80,15 @@ export default function ActivityLogs() {
   // Only admins and managers can view activity logs
   if (!hasPermission('dashboard', 'view')) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
-        <Navbar />
-        <main className="max-w-6xl mx-auto p-4 sm:p-8">
+      <AppLayout>
+        <
+        <div className="max-w-6xl mx-auto p-4 sm:p-8">
           <Card className="p-8 text-center">
             <Activity className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
             <p className="text-muted-foreground">You don't have permission to view activity logs.</p>
           </Card>
-        </main>
+        </div>
       </div>
     );
   }
@@ -127,9 +127,8 @@ export default function ActivityLogs() {
   const uniqueActions = [...new Set(logs.map(l => l.action))];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
-      <Navbar />
-      <main className="max-w-6xl mx-auto p-4 sm:p-8">
+    <AppLayout>
+      <div className="max-w-6xl mx-auto p-4 sm:p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
@@ -232,7 +231,7 @@ export default function ActivityLogs() {
             </p>
           )}
         </Card>
-      </main>
+      </div>
     </div>
   );
 }
