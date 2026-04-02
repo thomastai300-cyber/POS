@@ -337,6 +337,6 @@ export default function Integrations() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </AppLayout>
   );
 }

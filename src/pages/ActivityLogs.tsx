@@ -232,6 +232,6 @@ export default function ActivityLogs() {
           )}
         </Card>
       </div>
-    </div>
+    </AppLayout>
   );
 }
