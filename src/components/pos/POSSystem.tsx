@@ -10,14 +10,21 @@ import {
   Receipt,
   Printer,
   X,
-  ScanBarcode
+  ScanBarcode,
+  Award,
+  User
 } from 'lucide-react';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStockStore } from '@/store/stockStore';
+import { useCustomerStore } from '@/store/customerStore';
+import { useLoyaltyStore } from '@/store/loyaltyStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { useToast } from '@/hooks/use-toast';
 import { formatKES } from '@/lib/currency';
 import { ActivityLogger } from '@/lib/activityLogger';
@@ -36,9 +43,15 @@ export function POSSystem() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
+  const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState('');
   
   const receiptRef = useRef<HTMLDivElement>(null);
   const { items, addSale, fetchItems } = useStockStore();
+  const { customers, recordPurchase, addLoyaltyPoints } = useCustomerStore();
+  const { getCardByCustomerId, earnPoints, redeemPoints } = useLoyaltyStore();
+  const { loyaltySettings } = useSettingsStore();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,19 +97,42 @@ export function POSSystem() {
     return cart.reduce((sum, item) => sum + item.total, 0);
   }, [cart]);
 
-  const discountAmount = parseFloat(discount) || 0;
+  const discountAmount = (parseFloat(discount) || 0) + loyaltyDiscount;
   const total = subtotal - discountAmount;
   const cashAmount = parseFloat(cashReceived) || 0;
   const balance = cashAmount - total;
 
+  // Selected customer info
+  const selectedCustomer = selectedCustomerId ? customers.find(c => c.id === selectedCustomerId) : null;
+  const selectedLoyaltyCard = selectedCustomerId ? getCardByCustomerId(selectedCustomerId) : null;
+
+  // Calculate loyalty points that would be earned
+  const pointsToEarn = Math.floor(total / loyaltySettings.pointsPerAmount);
+
+  const handleRedeemLoyaltyPoints = () => {
+    if (!selectedLoyaltyCard) return;
+    const pts = parseInt(loyaltyPointsToRedeem) || 0;
+    if (pts < loyaltySettings.minRedeemPoints) {
+      toast({ title: 'Error', description: `Minimum ${loyaltySettings.minRedeemPoints} points required`, variant: 'destructive' });
+      return;
+    }
+    if (pts > selectedLoyaltyCard.points) {
+      toast({ title: 'Error', description: 'Insufficient loyalty points', variant: 'destructive' });
+      return;
+    }
+    const discountValue = pts * loyaltySettings.redeemPointValue;
+    setLoyaltyDiscount(discountValue);
+    toast({ title: 'Loyalty Discount Applied', description: `${pts} points = ${formatKES(discountValue)} discount` });
+  };
+
+  const clearLoyaltyDiscount = () => {
+    setLoyaltyDiscount(0);
+    setLoyaltyPointsToRedeem('');
+  };
+
   const addToCart = (item: StockItem) => {
-    // Check if item is in stock
     if (item.quantity <= 0) {
-      toast({
-        title: 'Out of Stock',
-        description: `${item.name} is currently out of stock.`,
-        variant: 'destructive',
-      });
+      toast({ title: 'Out of Stock', description: `${item.name} is currently out of stock.`, variant: 'destructive' });
       return;
     }
 
@@ -104,13 +140,8 @@ export function POSSystem() {
       const existing = prev.find((c) => c.itemId === item.id);
       const currentCartQty = existing?.quantity || 0;
       
-      // Check if adding one more would exceed available stock
       if (currentCartQty >= item.quantity) {
-        toast({
-          title: 'Insufficient Stock',
-          description: `Only ${item.quantity} ${item.name} available.`,
-          variant: 'destructive',
-        });
+        toast({ title: 'Insufficient Stock', description: `Only ${item.quantity} ${item.name} available.`, variant: 'destructive' });
         return prev;
       }
 
@@ -151,13 +182,8 @@ export function POSSystem() {
           if (c.itemId === itemId) {
             const newQty = c.quantity + delta;
             if (newQty <= 0) return null;
-            // Check stock limit when increasing
             if (delta > 0 && item && newQty > item.quantity) {
-              toast({
-                title: 'Insufficient Stock',
-                description: `Only ${item.quantity} ${item.name} available.`,
-                variant: 'destructive',
-              });
+              toast({ title: 'Insufficient Stock', description: `Only ${item.quantity} ${item.name} available.`, variant: 'destructive' });
               return c;
             }
             return { ...c, quantity: newQty, total: newQty * c.price };
@@ -176,6 +202,9 @@ export function POSSystem() {
     setCart([]);
     setDiscount('0');
     setCashReceived('');
+    setSelectedCustomerId('');
+    setLoyaltyDiscount(0);
+    setLoyaltyPointsToRedeem('');
   };
 
   const generateReceiptNumber = () => {
@@ -188,29 +217,24 @@ export function POSSystem() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
-      toast({
-        title: 'Empty Cart',
-        description: 'Please add items to the cart first.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Empty Cart', description: 'Please add items to the cart first.', variant: 'destructive' });
       return;
     }
 
     if (cashAmount < total) {
-      toast({
-        title: 'Insufficient Cash',
-        description: 'Cash received is less than the total amount.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Insufficient Cash', description: 'Cash received is less than the total amount.', variant: 'destructive' });
       return;
     }
 
     const newReceiptNumber = generateReceiptNumber();
+    const loyaltyPointsRedeemedCount = loyaltyDiscount > 0 ? Math.round(loyaltyDiscount / loyaltySettings.redeemPointValue) : 0;
     
     const sale: Omit<Sale, 'id'> & { id?: string } = {
       timestamp: Date.now(),
       date: new Date().toISOString().split('T')[0],
-      saleType: 'retail',
+      customerId: selectedCustomerId || undefined,
+      customerName: selectedCustomer?.name,
+      saleType: selectedCustomer?.customerType || 'retail',
       totalItems: cart.reduce((sum, c) => sum + c.quantity, 0),
       subtotal,
       discount: discountAmount,
@@ -219,6 +243,8 @@ export function POSSystem() {
       amountPaid: cashAmount,
       balance,
       paymentMethod: 'cash',
+      loyaltyPointsEarned: pointsToEarn,
+      loyaltyPointsRedeemed: loyaltyPointsRedeemedCount,
       items: cart.map((c) => ({
         itemId: c.itemId,
         name: c.name,
@@ -232,21 +258,36 @@ export function POSSystem() {
     try {
       const completedSale = await addSale(sale as Omit<Sale, 'id'>);
       
-      // Log the sale activity
       ActivityLogger.sale(
         completedSale.id, 
         total, 
         cart.reduce((sum, c) => sum + c.quantity, 0)
       );
+
+      // Handle loyalty points
+      if (selectedCustomerId && selectedLoyaltyCard) {
+        // Redeem points if applicable
+        if (loyaltyPointsRedeemedCount > 0) {
+          redeemPoints(selectedLoyaltyCard.id, selectedCustomerId, loyaltyPointsRedeemedCount, `Redeemed at POS - Sale #${completedSale.id.slice(-6)}`);
+        }
+        
+        // Earn points on this purchase
+        if (pointsToEarn > 0) {
+          earnPoints(selectedLoyaltyCard.id, selectedCustomerId, pointsToEarn, completedSale.id);
+          addLoyaltyPoints(selectedCustomerId, pointsToEarn);
+        }
+        
+        // Record purchase on customer
+        recordPurchase(selectedCustomerId, total);
+      }
       
-      // Set the last sale for receipt display
       setLastSale(completedSale);
       setReceiptNumber(newReceiptNumber);
       setShowReceipt(true);
       
       toast({
         title: 'Sale Complete!',
-        description: `Transaction successful. Change: ${formatKES(balance)}`,
+        description: `Transaction successful. Change: ${formatKES(balance)}${pointsToEarn > 0 ? ` | +${pointsToEarn} loyalty pts` : ''}`,
       });
 
       clearCart();
@@ -270,13 +311,7 @@ export function POSSystem() {
               <title>ETR Receipt - ${receiptNumber}</title>
               <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
-                body { 
-                  font-family: 'Courier New', Courier, monospace; 
-                  padding: 10px;
-                  font-size: 12px;
-                  background: white;
-                  color: black;
-                }
+                body { font-family: 'Courier New', Courier, monospace; padding: 10px; font-size: 12px; background: white; color: black; }
                 .bg-white { background: white; }
                 .text-black { color: black; }
                 .p-6 { padding: 1.5rem; }
@@ -294,10 +329,8 @@ export function POSSystem() {
                 .mt-2 { margin-top: 0.5rem; }
                 .mt-3 { margin-top: 0.75rem; }
                 .pb-3 { padding-bottom: 0.75rem; }
-                .py-0\\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
                 .border-b { border-bottom: 1px dashed #999; }
                 .border-dashed { border-style: dashed; }
-                .border-gray-400 { border-color: #999; }
                 .flex { display: flex; }
                 .justify-between { justify-content: space-between; }
                 .w-24 { width: 6rem; }
@@ -306,7 +339,6 @@ export function POSSystem() {
                 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .max-w-\\[300px\\] { max-width: 300px; }
                 .mx-auto { margin-left: auto; margin-right: auto; }
-                .text-\\[10px\\] { font-size: 10px; }
               </style>
             </head>
             <body>${printContent}</body>
@@ -412,7 +444,7 @@ export function POSSystem() {
         {/* Cart */}
         <div className="lg:col-span-1">
           <div className="bg-card rounded-2xl shadow-card p-6 sticky top-24">
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
                 <ShoppingCart className="w-5 h-5 text-accent" />
               </div>
@@ -424,6 +456,52 @@ export function POSSystem() {
               )}
             </div>
 
+            {/* Customer Selection */}
+            <div className="mb-4">
+              <Label className="text-xs text-muted-foreground mb-1 block">Customer (optional)</Label>
+              <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v === 'none' ? '' : v); clearLoyaltyDiscount(); }}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Walk-in customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Walk-in customer</SelectItem>
+                  {customers.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        <User className="w-3 h-3" />
+                        {c.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedLoyaltyCard && (
+                <div className="mt-2 p-2 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Award className="w-3.5 h-3.5 text-primary" />
+                    <span className="font-medium text-primary">{selectedLoyaltyCard.points} pts</span>
+                    <Badge variant="outline" className="text-[10px] capitalize ml-auto">{selectedLoyaltyCard.tier}</Badge>
+                  </div>
+                  {selectedLoyaltyCard.points >= loyaltySettings.minRedeemPoints && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <Input
+                        type="number"
+                        placeholder="Points"
+                        value={loyaltyPointsToRedeem}
+                        onChange={(e) => setLoyaltyPointsToRedeem(e.target.value)}
+                        className="h-7 text-xs flex-1"
+                        min={loyaltySettings.minRedeemPoints}
+                        max={selectedLoyaltyCard.points}
+                      />
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleRedeemLoyaltyPoints}>
+                        Redeem
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {cart.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -431,7 +509,7 @@ export function POSSystem() {
                 <p className="text-xs">Click products to add them</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-60 overflow-y-auto mb-4">
+              <div className="space-y-3 max-h-48 overflow-y-auto mb-4">
                 {cart.map((item) => (
                   <div
                     key={item.itemId}
@@ -500,10 +578,31 @@ export function POSSystem() {
                 />
               </div>
 
+              {loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-primary flex items-center gap-1">
+                    <Award className="w-3 h-3" /> Loyalty
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-primary">-{formatKES(loyaltyDiscount)}</span>
+                    <Button size="icon" variant="ghost" className="h-5 w-5" onClick={clearLoyaltyDiscount}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between text-lg font-bold border-t border-border pt-3">
                 <span className="text-foreground">Total</span>
                 <span className="text-primary">{formatKES(total)}</span>
               </div>
+
+              {selectedCustomerId && pointsToEarn > 0 && (
+                <div className="flex items-center gap-1 text-xs text-primary">
+                  <Award className="w-3 h-3" />
+                  <span>Customer earns +{pointsToEarn} loyalty points</span>
+                </div>
+              )}
 
               <div className="flex items-center gap-2">
                 <Label className="text-sm text-muted-foreground w-20">Cash</Label>
