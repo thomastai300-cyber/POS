@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -29,7 +29,7 @@ export default function Loyalty() {
   
   const { cards, transactions, getCard, redeemPoints: processRedeem } = useLoyaltyStore();
   const { loyaltySettings, updateLoyaltySettings } = useSettingsStore();
-  const { getCustomer, redeemLoyaltyPoints } = useCustomerStore();
+  const { redeemLoyaltyPoints } = useCustomerStore();
   const { toast } = useToast();
 
   const filteredCards = cards.filter(
@@ -83,9 +83,8 @@ export default function Loyalty() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
-      <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <AppLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
             <Award className="w-6 h-6 text-primary-foreground" />
@@ -365,7 +364,7 @@ export default function Loyalty() {
             </Card>
           </TabsContent>
         </Tabs>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
