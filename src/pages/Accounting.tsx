@@ -452,6 +452,6 @@ export default function Accounting() {
           </DialogContent>
         </Dialog>
       </div>
-    </div>
+    </AppLayout>
   );
 }
