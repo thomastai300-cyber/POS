@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,6 @@ import {
   Shield, 
   Search, 
   MoreVertical,
-  Trash2,
-  Edit2,
   Check,
   X
 } from 'lucide-react';
@@ -58,27 +56,29 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
-  const [selectedRole, setSelectedRole] = useState<AppRole>('cashier');
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    role: 'cashier' as AppRole,
+  });
 
-  // Check permissions
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
   if (!hasPermission('users', 'view')) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
-        <Navbar />
-        <main className="max-w-6xl mx-auto p-4 sm:p-8">
+      <AppLayout>
+        <div className="max-w-6xl mx-auto p-4 sm:p-8">
           <Card className="p-8 text-center">
             <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
             <p className="text-muted-foreground">You don't have permission to view this page.</p>
           </Card>
-        </main>
-      </div>
+        </div>
+      </AppLayout>
     );
   }
 
@@ -134,13 +134,11 @@ export default function UsersPage() {
     }
 
     try {
-      // Delete existing role
       await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', userId);
 
-      // Insert new role
       const { error } = await supabase
         .from('user_roles')
         .insert({
@@ -184,6 +182,68 @@ export default function UsersPage() {
     }
   };
 
+  const handleAddUser = async () => {
+    if (!newUserForm.email || !newUserForm.password || !newUserForm.fullName) {
+      toast({ title: 'Error', description: 'All fields are required', variant: 'destructive' });
+      return;
+    }
+
+    if (newUserForm.password.length < 6) {
+      toast({ title: 'Error', description: 'Password must be at least 6 characters', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      // Sign up the new user via Supabase Auth
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: newUserForm.email,
+        password: newUserForm.password,
+        options: {
+          data: { full_name: newUserForm.fullName }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (signUpData.user) {
+        // The trigger will create profile and assign default role
+        // We need to update the role if not cashier
+        if (newUserForm.role !== 'cashier') {
+          // Wait a moment for trigger to execute
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', signUpData.user.id);
+
+          await supabase
+            .from('user_roles')
+            .insert({
+              user_id: signUpData.user.id,
+              role: newUserForm.role,
+              assigned_by: user?.id
+            });
+        }
+      }
+
+      toast({ 
+        title: 'User Created', 
+        description: `${newUserForm.fullName} has been added as ${newUserForm.role}. They will need to verify their email.` 
+      });
+      setIsAddUserOpen(false);
+      setNewUserForm({ email: '', password: '', fullName: '', role: 'cashier' });
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error adding user:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to create user', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
   const getRoleBadgeColor = (role: AppRole) => {
     switch (role) {
       case 'admin': return 'bg-destructive/10 text-destructive border-destructive/20';
@@ -194,9 +254,8 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5">
-      <Navbar />
-      <main className="max-w-6xl mx-auto p-4 sm:p-8">
+    <AppLayout>
+      <div className="max-w-6xl mx-auto p-4 sm:p-8">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
             <Users className="w-6 h-6 text-primary-foreground" />
@@ -219,6 +278,12 @@ export default function UsersPage() {
                 className="pl-10"
               />
             </div>
+            {hasPermission('users', 'create') && (
+              <Button onClick={() => setIsAddUserOpen(true)}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add User
+              </Button>
+            )}
           </div>
 
           {/* Users Table */}
@@ -342,7 +407,70 @@ export default function UsersPage() {
             </div>
           </div>
         </Card>
-      </main>
-    </div>
+
+        {/* Add User Modal */}
+        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5" />
+                Add New User
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input
+                  value={newUserForm.fullName}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, fullName: e.target.value })}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email *</Label>
+                <Input
+                  type="email"
+                  value={newUserForm.email}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Password *</Label>
+                <Input
+                  type="password"
+                  value={newUserForm.password}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select
+                  value={newUserForm.role}
+                  onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v as AppRole })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin - Full access</SelectItem>
+                    <SelectItem value="manager">Manager - Most access</SelectItem>
+                    <SelectItem value="cashier">Cashier - Billing only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="secondary" onClick={() => setIsAddUserOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddUser}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Create User
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AppLayout>
   );
 }
