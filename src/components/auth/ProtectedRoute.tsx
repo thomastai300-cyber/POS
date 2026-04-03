@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, module, requiredAction = 'view' }: ProtectedRouteProps) {
-  const { user, isLoading, hasPermission } = useAuth();
+  const { user, isLoading, hasPermission, role } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -25,6 +25,11 @@ export function ProtectedRoute({ children, module, requiredAction = 'view' }: Pr
 
   if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Cashiers cannot access stock module
+  if (role === 'cashier' && module === 'stock') {
+    return <Navigate to="/billing" replace />;
   }
 
   // If a module is specified, check permissions

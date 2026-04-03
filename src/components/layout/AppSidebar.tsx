@@ -67,7 +67,11 @@ export function AppSidebar() {
   };
 
   const renderNavGroup = (links: typeof mainNavLinks, label: string) => {
-    const visibleLinks = links.filter(link => hasPermission(link.module, 'view'));
+    const visibleLinks = links.filter(link => {
+      // Cashiers cannot see Stock
+      if (role === 'cashier' && link.module === 'stock') return false;
+      return hasPermission(link.module, 'view');
+    });
     if (visibleLinks.length === 0) return null;
 
     return (

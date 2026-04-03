@@ -12,7 +12,9 @@ import {
   X,
   ScanBarcode,
   Award,
-  User
+  User,
+  Smartphone,
+  Banknote
 } from 'lucide-react';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { Button } from '@/components/ui/button';
@@ -35,11 +37,16 @@ interface CartItem extends SaleItem {
   item: StockItem;
 }
 
+type PaymentMethod = 'cash' | 'mpesa' | 'mixed';
+
 export function POSSystem() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState('0');
   const [cashReceived, setCashReceived] = useState('');
+  const [mpesaAmount, setMpesaAmount] = useState('');
+  const [mpesaRef, setMpesaRef] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [receiptNumber, setReceiptNumber] = useState('');
@@ -58,7 +65,6 @@ export function POSSystem() {
     fetchItems();
   }, [fetchItems]);
 
-  // Barcode scanner integration
   const handleBarcodeScan = useCallback(
     (barcode: string) => {
       const item = items.find(
@@ -66,16 +72,9 @@ export function POSSystem() {
       );
       if (item) {
         addToCart(item);
-        toast({
-          title: 'Item Added',
-          description: `${item.name} scanned and added to cart`,
-        });
+        toast({ title: 'Item Added', description: `${item.name} scanned and added to cart` });
       } else {
-        toast({
-          title: 'Product Not Found',
-          description: `No product found with barcode: ${barcode}`,
-          variant: 'destructive',
-        });
+        toast({ title: 'Product Not Found', description: `No product found with barcode: ${barcode}`, variant: 'destructive' });
       }
     },
     [items, toast]
@@ -100,13 +99,15 @@ export function POSSystem() {
   const discountAmount = (parseFloat(discount) || 0) + loyaltyDiscount;
   const total = subtotal - discountAmount;
   const cashAmount = parseFloat(cashReceived) || 0;
-  const balance = cashAmount - total;
+  const mpesaPaid = parseFloat(mpesaAmount) || 0;
+  
+  const totalPaid = paymentMethod === 'cash' ? cashAmount 
+    : paymentMethod === 'mpesa' ? mpesaPaid 
+    : cashAmount + mpesaPaid;
+  const balance = totalPaid - total;
 
-  // Selected customer info
   const selectedCustomer = selectedCustomerId ? customers.find(c => c.id === selectedCustomerId) : null;
   const selectedLoyaltyCard = selectedCustomerId ? getCardByCustomerId(selectedCustomerId) : null;
-
-  // Calculate loyalty points that would be earned
   const pointsToEarn = Math.floor(total / loyaltySettings.pointsPerAmount);
 
   const handleRedeemLoyaltyPoints = () => {
@@ -202,6 +203,9 @@ export function POSSystem() {
     setCart([]);
     setDiscount('0');
     setCashReceived('');
+    setMpesaAmount('');
+    setMpesaRef('');
+    setPaymentMethod('cash');
     setSelectedCustomerId('');
     setLoyaltyDiscount(0);
     setLoyaltyPointsToRedeem('');
@@ -221,14 +225,21 @@ export function POSSystem() {
       return;
     }
 
-    if (cashAmount < total) {
-      toast({ title: 'Insufficient Cash', description: 'Cash received is less than the total amount.', variant: 'destructive' });
+    if (paymentMethod === 'mpesa' && !mpesaRef.trim()) {
+      toast({ title: 'M-Pesa Reference Required', description: 'Enter the M-Pesa transaction reference code.', variant: 'destructive' });
+      return;
+    }
+
+    if (totalPaid < total) {
+      toast({ title: 'Insufficient Payment', description: 'Amount paid is less than the total.', variant: 'destructive' });
       return;
     }
 
     const newReceiptNumber = generateReceiptNumber();
     const loyaltyPointsRedeemedCount = loyaltyDiscount > 0 ? Math.round(loyaltyDiscount / loyaltySettings.redeemPointValue) : 0;
     
+    const salePaymentMethod = paymentMethod === 'mixed' ? 'mixed' : paymentMethod;
+
     const sale: Omit<Sale, 'id'> & { id?: string } = {
       timestamp: Date.now(),
       date: new Date().toISOString().split('T')[0],
@@ -240,9 +251,10 @@ export function POSSystem() {
       discount: discountAmount,
       tax: 0,
       total,
-      amountPaid: cashAmount,
+      amountPaid: totalPaid,
       balance,
-      paymentMethod: 'cash',
+      paymentMethod: salePaymentMethod as any,
+      mpesaRef: paymentMethod !== 'cash' ? mpesaRef : undefined,
       loyaltyPointsEarned: pointsToEarn,
       loyaltyPointsRedeemed: loyaltyPointsRedeemedCount,
       items: cart.map((c) => ({
@@ -264,20 +276,14 @@ export function POSSystem() {
         cart.reduce((sum, c) => sum + c.quantity, 0)
       );
 
-      // Handle loyalty points
       if (selectedCustomerId && selectedLoyaltyCard) {
-        // Redeem points if applicable
         if (loyaltyPointsRedeemedCount > 0) {
           redeemPoints(selectedLoyaltyCard.id, selectedCustomerId, loyaltyPointsRedeemedCount, `Redeemed at POS - Sale #${completedSale.id.slice(-6)}`);
         }
-        
-        // Earn points on this purchase
         if (pointsToEarn > 0) {
           earnPoints(selectedLoyaltyCard.id, selectedCustomerId, pointsToEarn, completedSale.id);
           addLoyaltyPoints(selectedCustomerId, pointsToEarn);
         }
-        
-        // Record purchase on customer
         recordPurchase(selectedCustomerId, total);
       }
       
@@ -287,7 +293,7 @@ export function POSSystem() {
       
       toast({
         title: 'Sale Complete!',
-        description: `Transaction successful. Change: ${formatKES(balance)}${pointsToEarn > 0 ? ` | +${pointsToEarn} loyalty pts` : ''}`,
+        description: `Transaction successful via ${paymentMethod.toUpperCase()}. Change: ${formatKES(balance)}${pointsToEarn > 0 ? ` | +${pointsToEarn} loyalty pts` : ''}`,
       });
 
       clearCart();
@@ -604,20 +610,87 @@ export function POSSystem() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
-                <Label className="text-sm text-muted-foreground w-20">Cash</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  placeholder="0.00"
-                  className="h-8 bg-background border-input"
-                />
+              {/* Payment Method Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Payment Method</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                    className="h-9 text-xs"
+                    onClick={() => setPaymentMethod('cash')}
+                  >
+                    <Banknote className="w-3.5 h-3.5 mr-1" />
+                    Cash
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={paymentMethod === 'mpesa' ? 'default' : 'outline'}
+                    className="h-9 text-xs"
+                    onClick={() => setPaymentMethod('mpesa')}
+                  >
+                    <Smartphone className="w-3.5 h-3.5 mr-1" />
+                    M-Pesa
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={paymentMethod === 'mixed' ? 'default' : 'outline'}
+                    className="h-9 text-xs"
+                    onClick={() => setPaymentMethod('mixed')}
+                  >
+                    <CreditCard className="w-3.5 h-3.5 mr-1" />
+                    Split
+                  </Button>
+                </div>
               </div>
 
-              {cashAmount > 0 && (
+              {/* Cash Input */}
+              {(paymentMethod === 'cash' || paymentMethod === 'mixed') && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground w-20">Cash</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 bg-background border-input"
+                  />
+                </div>
+              )}
+
+              {/* M-Pesa Inputs */}
+              {(paymentMethod === 'mpesa' || paymentMethod === 'mixed') && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground w-20">M-Pesa</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={mpesaAmount}
+                      onChange={(e) => setMpesaAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="h-8 bg-background border-input"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground w-20">Ref Code</Label>
+                    <Input
+                      value={mpesaRef}
+                      onChange={(e) => setMpesaRef(e.target.value.toUpperCase())}
+                      placeholder="e.g. SHK12AB3CD"
+                      className="h-8 bg-background border-input font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {totalPaid > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Change</span>
                   <span className={`font-semibold ${balance >= 0 ? 'text-success' : 'text-destructive'}`}>
@@ -638,7 +711,7 @@ export function POSSystem() {
                 <Button
                   className="flex-1"
                   onClick={handleCheckout}
-                  disabled={cart.length === 0 || cashAmount < total}
+                  disabled={cart.length === 0 || totalPaid < total}
                 >
                   <Receipt className="w-4 h-4 mr-2" />
                   Checkout
