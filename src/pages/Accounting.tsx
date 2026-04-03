@@ -18,22 +18,30 @@ import {
   TrendingUp, 
   TrendingDown,
   Wallet,
-  CreditCard,
-  Building,
-  BarChart3
+  BarChart3,
+  Trash2,
+  Edit
 } from 'lucide-react';
 
 export default function Accounting() {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isPayableModalOpen, setIsPayableModalOpen] = useState(false);
+  const [isReceivableModalOpen, setIsReceivableModalOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
   
   const { 
     accounts, 
     expenses, 
     receivables, 
     payables, 
+    journalEntries,
     addExpense, 
     addPayable,
+    addReceivable,
+    addAccount,
+    addJournalEntry,
+    deleteExpense,
     recordReceivablePayment,
     recordPayablePayment,
     getTotalReceivables,
@@ -54,6 +62,28 @@ export default function Accounting() {
     description: '',
     amount: '',
     dueDate: '',
+  });
+
+  const [receivableForm, setReceivableForm] = useState({
+    customerName: '',
+    customerId: '',
+    amount: '',
+    dueDate: '',
+    description: '',
+  });
+
+  const [accountForm, setAccountForm] = useState({
+    name: '',
+    type: 'asset' as 'asset' | 'liability' | 'equity' | 'revenue' | 'expense',
+    code: '',
+  });
+
+  const [journalForm, setJournalForm] = useState({
+    description: '',
+    reference: '',
+    debitAccountId: '',
+    creditAccountId: '',
+    amount: '',
   });
 
   const handleAddExpense = () => {
@@ -93,9 +123,76 @@ export default function Accounting() {
     setPayableForm({ vendorName: '', description: '', amount: '', dueDate: '' });
   };
 
+  const handleAddReceivable = () => {
+    if (!receivableForm.customerName || !receivableForm.amount) {
+      toast({ title: 'Error', description: 'Customer name and amount required', variant: 'destructive' });
+      return;
+    }
+    addReceivable({
+      customerId: receivableForm.customerId || receivableForm.customerName.toLowerCase().replace(/\s/g, '-'),
+      customerName: receivableForm.customerName,
+      amount: parseFloat(receivableForm.amount),
+      amountPaid: 0,
+      balance: parseFloat(receivableForm.amount),
+      dueDate: receivableForm.dueDate ? new Date(receivableForm.dueDate).getTime() : Date.now() + 30 * 24 * 60 * 60 * 1000,
+      status: 'pending',
+    });
+    toast({ title: 'Success', description: 'Receivable added' });
+    setIsReceivableModalOpen(false);
+    setReceivableForm({ customerName: '', customerId: '', amount: '', dueDate: '', description: '' });
+  };
+
+  const handleAddAccount = () => {
+    if (!accountForm.name || !accountForm.code) {
+      toast({ title: 'Error', description: 'Name and code required', variant: 'destructive' });
+      return;
+    }
+    addAccount({
+      name: accountForm.name,
+      type: accountForm.type,
+      code: accountForm.code,
+    });
+    toast({ title: 'Success', description: 'Account added to chart' });
+    setIsAccountModalOpen(false);
+    setAccountForm({ name: '', type: 'asset', code: '' });
+  };
+
+  const handleAddJournalEntry = () => {
+    if (!journalForm.description || !journalForm.amount || !journalForm.debitAccountId || !journalForm.creditAccountId) {
+      toast({ title: 'Error', description: 'All fields required', variant: 'destructive' });
+      return;
+    }
+    const debitAcc = accounts.find(a => a.id === journalForm.debitAccountId);
+    const creditAcc = accounts.find(a => a.id === journalForm.creditAccountId);
+    if (!debitAcc || !creditAcc) return;
+
+    addJournalEntry({
+      date: Date.now(),
+      description: journalForm.description,
+      reference: journalForm.reference,
+      entries: [
+        { accountId: debitAcc.id, accountName: debitAcc.name, debit: parseFloat(journalForm.amount), credit: 0 },
+        { accountId: creditAcc.id, accountName: creditAcc.name, debit: 0, credit: parseFloat(journalForm.amount) },
+      ],
+    });
+    toast({ title: 'Success', description: 'Journal entry recorded' });
+    setIsJournalModalOpen(false);
+    setJournalForm({ description: '', reference: '', debitAccountId: '', creditAccountId: '', amount: '' });
+  };
+
+  const handleRecordPayment = (type: 'receivable' | 'payable', id: string) => {
+    const amount = prompt('Enter payment amount:');
+    if (!amount || isNaN(parseFloat(amount))) return;
+    if (type === 'receivable') {
+      recordReceivablePayment(id, parseFloat(amount));
+    } else {
+      recordPayablePayment(id, parseFloat(amount));
+    }
+    toast({ title: 'Payment Recorded', description: `${formatKES(parseFloat(amount))} payment recorded` });
+  };
+
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const assetAccounts = accounts.filter((a) => a.type === 'asset');
-  const expenseCategories = ['Rent', 'Utilities', 'Salaries', 'Supplies', 'Transport', 'Marketing', 'Other'];
+  const expenseCategories = ['Rent', 'Utilities', 'Salaries', 'Supplies', 'Transport', 'Marketing', 'Insurance', 'Maintenance', 'Other'];
 
   return (
     <AppLayout>
@@ -163,9 +260,11 @@ export default function Accounting() {
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="receivables">Receivables</TabsTrigger>
             <TabsTrigger value="payables">Payables</TabsTrigger>
+            <TabsTrigger value="journal">Journal Entries</TabsTrigger>
             <TabsTrigger value="accounts">Chart of Accounts</TabsTrigger>
           </TabsList>
 
+          {/* Expenses Tab */}
           <TabsContent value="expenses">
             <Card className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -192,6 +291,7 @@ export default function Accounting() {
                         <th className="text-left py-3 px-2">Vendor</th>
                         <th className="text-left py-3 px-2">Method</th>
                         <th className="text-right py-3 px-2">Amount</th>
+                        <th className="text-right py-3 px-2">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -209,6 +309,11 @@ export default function Accounting() {
                           <td className="py-3 px-2 text-right font-semibold text-destructive">
                             {formatKES(expense.amount)}
                           </td>
+                          <td className="py-3 px-2 text-right">
+                            <Button size="icon" variant="ghost" onClick={() => deleteExpense(expense.id)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -218,9 +323,16 @@ export default function Accounting() {
             </Card>
           </TabsContent>
 
+          {/* Receivables Tab */}
           <TabsContent value="receivables">
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Accounts Receivable</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Accounts Receivable</h2>
+                <Button onClick={() => setIsReceivableModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Receivable
+                </Button>
+              </div>
               {receivables.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-30" />
@@ -228,38 +340,49 @@ export default function Accounting() {
                   <p className="text-sm">Credit sales will appear here</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {receivables.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-semibold">{r.customerName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Due: {new Date(r.dueDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-success">{formatKES(r.balance)}</p>
-                        <Badge variant={r.status === 'overdue' ? 'destructive' : 'secondary'}>
-                          {r.status}
-                        </Badge>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => {
-                          const amount = prompt('Enter payment amount:');
-                          if (amount) recordReceivablePayment(r.id, parseFloat(amount));
-                        }}
-                      >
-                        Record Payment
-                      </Button>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2">Customer</th>
+                        <th className="text-right py-3 px-2">Total</th>
+                        <th className="text-right py-3 px-2">Paid</th>
+                        <th className="text-right py-3 px-2">Balance</th>
+                        <th className="text-left py-3 px-2">Due Date</th>
+                        <th className="text-left py-3 px-2">Status</th>
+                        <th className="text-right py-3 px-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receivables.map((r) => (
+                        <tr key={r.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-2 font-medium">{r.customerName}</td>
+                          <td className="py-3 px-2 text-right">{formatKES(r.amount)}</td>
+                          <td className="py-3 px-2 text-right text-success">{formatKES(r.amountPaid)}</td>
+                          <td className="py-3 px-2 text-right font-semibold">{formatKES(r.balance)}</td>
+                          <td className="py-3 px-2 text-sm">{new Date(r.dueDate).toLocaleDateString()}</td>
+                          <td className="py-3 px-2">
+                            <Badge variant={r.status === 'overdue' ? 'destructive' : r.status === 'paid' ? 'default' : 'secondary'}>
+                              {r.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            {r.status !== 'paid' && (
+                              <Button size="sm" variant="outline" onClick={() => handleRecordPayment('receivable', r.id)}>
+                                Record Payment
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </Card>
           </TabsContent>
 
+          {/* Payables Tab */}
           <TabsContent value="payables">
             <Card className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -275,32 +398,89 @@ export default function Accounting() {
                   <p>No outstanding payables</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {payables.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-semibold">{p.vendorName}</p>
-                        <p className="text-sm text-muted-foreground">{p.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Due: {new Date(p.dueDate).toLocaleDateString()}
-                        </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2">Vendor</th>
+                        <th className="text-left py-3 px-2">Description</th>
+                        <th className="text-right py-3 px-2">Total</th>
+                        <th className="text-right py-3 px-2">Paid</th>
+                        <th className="text-right py-3 px-2">Balance</th>
+                        <th className="text-left py-3 px-2">Due Date</th>
+                        <th className="text-left py-3 px-2">Status</th>
+                        <th className="text-right py-3 px-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payables.map((p) => (
+                        <tr key={p.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-2 font-medium">{p.vendorName}</td>
+                          <td className="py-3 px-2 text-sm">{p.description}</td>
+                          <td className="py-3 px-2 text-right">{formatKES(p.amount)}</td>
+                          <td className="py-3 px-2 text-right text-success">{formatKES(p.amountPaid)}</td>
+                          <td className="py-3 px-2 text-right font-semibold text-destructive">{formatKES(p.balance)}</td>
+                          <td className="py-3 px-2 text-sm">{new Date(p.dueDate).toLocaleDateString()}</td>
+                          <td className="py-3 px-2">
+                            <Badge variant={p.status === 'overdue' ? 'destructive' : p.status === 'paid' ? 'default' : 'secondary'}>
+                              {p.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            {p.status !== 'paid' && (
+                              <Button size="sm" variant="outline" onClick={() => handleRecordPayment('payable', p.id)}>
+                                Pay
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* Journal Entries Tab */}
+          <TabsContent value="journal">
+            <Card className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Journal Entries</h2>
+                <Button onClick={() => setIsJournalModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Entry
+                </Button>
+              </div>
+              {journalEntries.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                  <p>No journal entries</p>
+                  <p className="text-sm">Record double-entry transactions here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {journalEntries.slice().reverse().map((entry) => (
+                    <div key={entry.id} className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-semibold">{entry.description}</p>
+                          {entry.reference && <p className="text-xs text-muted-foreground">Ref: {entry.reference}</p>}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{new Date(entry.date).toLocaleDateString()}</span>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-destructive">{formatKES(p.balance)}</p>
-                        <Badge variant={p.status === 'overdue' ? 'destructive' : 'secondary'}>
-                          {p.status}
-                        </Badge>
+                      <div className="grid grid-cols-3 gap-2 text-sm mt-2">
+                        <div className="font-medium text-muted-foreground">Account</div>
+                        <div className="text-right font-medium text-muted-foreground">Debit</div>
+                        <div className="text-right font-medium text-muted-foreground">Credit</div>
+                        {entry.entries.map((line, idx) => (
+                          <div key={idx} className="contents">
+                            <div>{line.accountName}</div>
+                            <div className="text-right">{line.debit > 0 ? formatKES(line.debit) : '-'}</div>
+                            <div className="text-right">{line.credit > 0 ? formatKES(line.credit) : '-'}</div>
+                          </div>
+                        ))}
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => {
-                          const amount = prompt('Enter payment amount:');
-                          if (amount) recordPayablePayment(p.id, parseFloat(amount));
-                        }}
-                      >
-                        Pay
-                      </Button>
                     </div>
                   ))}
                 </div>
@@ -308,28 +488,39 @@ export default function Accounting() {
             </Card>
           </TabsContent>
 
+          {/* Chart of Accounts Tab */}
           <TabsContent value="accounts">
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Chart of Accounts</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Chart of Accounts</h2>
+                <Button onClick={() => setIsAccountModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Account
+                </Button>
+              </div>
               <div className="space-y-4">
-                {['asset', 'liability', 'equity', 'revenue', 'expense'].map((type) => (
-                  <div key={type}>
-                    <h3 className="font-semibold capitalize mb-2 text-muted-foreground">{type}s</h3>
-                    <div className="space-y-2">
-                      {accounts.filter((a) => a.type === type).map((acc) => (
-                        <div key={acc.id} className="flex justify-between p-3 bg-muted/50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-sm text-muted-foreground">{acc.code}</span>
-                            <span>{acc.name}</span>
+                {['asset', 'liability', 'equity', 'revenue', 'expense'].map((type) => {
+                  const typeAccounts = accounts.filter((a) => a.type === type);
+                  if (typeAccounts.length === 0) return null;
+                  return (
+                    <div key={type}>
+                      <h3 className="font-semibold capitalize mb-2 text-muted-foreground">{type}s</h3>
+                      <div className="space-y-2">
+                        {typeAccounts.map((acc) => (
+                          <div key={acc.id} className="flex justify-between p-3 bg-muted/50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-sm text-muted-foreground">{acc.code}</span>
+                              <span>{acc.name}</span>
+                            </div>
+                            <span className={`font-semibold ${acc.balance >= 0 ? 'text-foreground' : 'text-destructive'}`}>
+                              {formatKES(Math.abs(acc.balance))}
+                            </span>
                           </div>
-                          <span className={`font-semibold ${acc.balance >= 0 ? 'text-foreground' : 'text-destructive'}`}>
-                            {formatKES(Math.abs(acc.balance))}
-                          </span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           </TabsContent>
@@ -345,9 +536,7 @@ export default function Accounting() {
               <div className="space-y-2">
                 <Label>Category *</Label>
                 <Select value={expenseForm.category} onValueChange={(v) => setExpenseForm({ ...expenseForm, category: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {expenseCategories.map((cat) => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
@@ -357,30 +546,16 @@ export default function Accounting() {
               </div>
               <div className="space-y-2">
                 <Label>Description</Label>
-                <Input
-                  value={expenseForm.description}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  placeholder="Description"
-                />
+                <Input value={expenseForm.description} onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Description" />
               </div>
               <div className="space-y-2">
                 <Label>Amount *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={expenseForm.amount}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                />
+                <Input type="number" min="0" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Payment Method</Label>
-                <Select 
-                  value={expenseForm.paymentMethod} 
-                  onValueChange={(v) => setExpenseForm({ ...expenseForm, paymentMethod: v as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={expenseForm.paymentMethod} onValueChange={(v) => setExpenseForm({ ...expenseForm, paymentMethod: v as any })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="mpesa">M-Pesa</SelectItem>
@@ -390,11 +565,7 @@ export default function Accounting() {
               </div>
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Input
-                  value={expenseForm.vendor}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, vendor: e.target.value })}
-                  placeholder="Vendor name"
-                />
+                <Input value={expenseForm.vendor} onChange={(e) => setExpenseForm({ ...expenseForm, vendor: e.target.value })} placeholder="Vendor name" />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <Button variant="secondary" onClick={() => setIsExpenseModalOpen(false)}>Cancel</Button>
@@ -407,46 +578,133 @@ export default function Accounting() {
         {/* Add Payable Modal */}
         <Dialog open={isPayableModalOpen} onOpenChange={setIsPayableModalOpen}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Payable</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Add Payable</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Vendor Name *</Label>
-                <Input
-                  value={payableForm.vendorName}
-                  onChange={(e) => setPayableForm({ ...payableForm, vendorName: e.target.value })}
-                  placeholder="Vendor name"
-                />
+                <Input value={payableForm.vendorName} onChange={(e) => setPayableForm({ ...payableForm, vendorName: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Description</Label>
-                <Input
-                  value={payableForm.description}
-                  onChange={(e) => setPayableForm({ ...payableForm, description: e.target.value })}
-                  placeholder="Description"
-                />
+                <Input value={payableForm.description} onChange={(e) => setPayableForm({ ...payableForm, description: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Amount *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={payableForm.amount}
-                  onChange={(e) => setPayableForm({ ...payableForm, amount: e.target.value })}
-                />
+                <Input type="number" min="0" value={payableForm.amount} onChange={(e) => setPayableForm({ ...payableForm, amount: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={payableForm.dueDate}
-                  onChange={(e) => setPayableForm({ ...payableForm, dueDate: e.target.value })}
-                />
+                <Input type="date" value={payableForm.dueDate} onChange={(e) => setPayableForm({ ...payableForm, dueDate: e.target.value })} />
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <Button variant="secondary" onClick={() => setIsPayableModalOpen(false)}>Cancel</Button>
                 <Button onClick={handleAddPayable}>Add Payable</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Receivable Modal */}
+        <Dialog open={isReceivableModalOpen} onOpenChange={setIsReceivableModalOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Receivable</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Customer Name *</Label>
+                <Input value={receivableForm.customerName} onChange={(e) => setReceivableForm({ ...receivableForm, customerName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Amount *</Label>
+                <Input type="number" min="0" value={receivableForm.amount} onChange={(e) => setReceivableForm({ ...receivableForm, amount: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Due Date</Label>
+                <Input type="date" value={receivableForm.dueDate} onChange={(e) => setReceivableForm({ ...receivableForm, dueDate: e.target.value })} />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="secondary" onClick={() => setIsReceivableModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddReceivable}>Add Receivable</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Account Modal */}
+        <Dialog open={isAccountModalOpen} onOpenChange={setIsAccountModalOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Account Name *</Label>
+                <Input value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="e.g. Petty Cash" />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Code *</Label>
+                <Input value={accountForm.code} onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })} placeholder="e.g. 1003" />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={accountForm.type} onValueChange={(v) => setAccountForm({ ...accountForm, type: v as any })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asset">Asset</SelectItem>
+                    <SelectItem value="liability">Liability</SelectItem>
+                    <SelectItem value="equity">Equity</SelectItem>
+                    <SelectItem value="revenue">Revenue</SelectItem>
+                    <SelectItem value="expense">Expense</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="secondary" onClick={() => setIsAccountModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddAccount}>Add Account</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Journal Entry Modal */}
+        <Dialog open={isJournalModalOpen} onOpenChange={setIsJournalModalOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>New Journal Entry</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Description *</Label>
+                <Input value={journalForm.description} onChange={(e) => setJournalForm({ ...journalForm, description: e.target.value })} placeholder="Transaction description" />
+              </div>
+              <div className="space-y-2">
+                <Label>Reference</Label>
+                <Input value={journalForm.reference} onChange={(e) => setJournalForm({ ...journalForm, reference: e.target.value })} placeholder="e.g. INV-001" />
+              </div>
+              <div className="space-y-2">
+                <Label>Debit Account *</Label>
+                <Select value={journalForm.debitAccountId} onValueChange={(v) => setJournalForm({ ...journalForm, debitAccountId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Credit Account *</Label>
+                <Select value={journalForm.creditAccountId} onValueChange={(v) => setJournalForm({ ...journalForm, creditAccountId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Amount *</Label>
+                <Input type="number" min="0" value={journalForm.amount} onChange={(e) => setJournalForm({ ...journalForm, amount: e.target.value })} />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="secondary" onClick={() => setIsJournalModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddJournalEntry}>Record Entry</Button>
               </div>
             </div>
           </DialogContent>
