@@ -27,6 +27,11 @@ export function ProtectedRoute({ children, module, requiredAction = 'view' }: Pr
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // Cashiers cannot access stock module
+  if (role === 'cashier' && module === 'stock') {
+    return <Navigate to="/billing" replace />;
+  }
+
   // If a module is specified, check permissions
   if (module && !hasPermission(module, requiredAction)) {
     return (
