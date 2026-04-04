@@ -1,27 +1,14 @@
-import { Store, FileText, Package, BarChart3, Settings, Users, Gift, Calculator, Plug, LogOut, User, Activity } from 'lucide-react';
+import { Building2, Store, FileText, Package, BarChart3, Settings, Users, Gift, Calculator, Plug, LogOut, User, Activity, Shield } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { NavLink } from '@/components/NavLink';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 
@@ -48,17 +35,13 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { user, profile, role, signOut, hasPermission } = useAuth();
+  const { user, profile, role, signOut, hasPermission, isSuperAdmin, business } = useAuth();
 
-  const isActive = (path: string) => {
-    if (path === '/stock') {
-      return location.pathname === '/stock' || location.pathname === '/';
-    }
-    return location.pathname === path;
-  };
+  const isActive = (path: string) => location.pathname === path;
 
   const getRoleBadgeColor = (role: string | null) => {
     switch (role) {
+      case 'super_admin': return 'bg-accent/10 text-accent';
       case 'admin': return 'bg-destructive/10 text-destructive';
       case 'manager': return 'bg-warning/10 text-warning';
       case 'cashier': return 'bg-primary/10 text-primary';
@@ -68,9 +51,8 @@ export function AppSidebar() {
 
   const renderNavGroup = (links: typeof mainNavLinks, label: string) => {
     const visibleLinks = links.filter(link => {
-      // Cashiers cannot see Stock
       if (role === 'cashier' && link.module === 'stock') return false;
-      return hasPermission(link.module, 'view');
+      return isSuperAdmin || hasPermission(link.module, 'view');
     });
     if (visibleLinks.length === 0) return null;
 
@@ -99,18 +81,45 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-            <Store className="w-5 h-5 text-primary-foreground" />
+          <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5 text-primary-foreground" />
           </div>
           {!collapsed && (
-            <h1 className="text-lg font-bold text-foreground truncate">
-              Ringo Retail
-            </h1>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-foreground truncate">
+                {isSuperAdmin ? 'Ringo POS' : business?.name || 'Ringo POS'}
+              </h1>
+              {business && !isSuperAdmin && (
+                <p className="text-[10px] text-muted-foreground truncate">Business Portal</p>
+              )}
+              {isSuperAdmin && (
+                <p className="text-[10px] text-accent font-medium">Platform Admin</p>
+              )}
+            </div>
           )}
         </div>
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Super Admin Link */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isActive('/super-admin')}>
+                    <NavLink to="/super-admin" end className="hover:bg-muted/50" activeClassName="bg-accent/10 text-accent font-medium">
+                      <Shield className="mr-2 h-4 w-4" />
+                      {!collapsed && <span>Businesses</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {renderNavGroup(mainNavLinks, 'Sales')}
         {renderNavGroup(managementNavLinks, 'Management')}
         {renderNavGroup(systemNavLinks, 'System')}
@@ -128,7 +137,7 @@ export function AppSidebar() {
                       {profile?.full_name || user.email?.split('@')[0]}
                     </span>
                     <Badge className={`${getRoleBadgeColor(role)} capitalize text-[10px] px-1.5 py-0`}>
-                      {role || 'User'}
+                      {role === 'super_admin' ? 'Super Admin' : role || 'User'}
                     </Badge>
                   </div>
                 )}
