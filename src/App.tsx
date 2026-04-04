@@ -17,6 +17,7 @@ import Users from "./pages/Users";
 import ActivityLogs from "./pages/ActivityLogs";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import SuperAdmin from "./pages/SuperAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,55 +33,40 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Navigate to="/billing" replace />} />
-            <Route path="/stock" element={
-              <ProtectedRoute module="stock">
-                <Stock />
+            <Route path="/super-admin" element={
+              <ProtectedRoute superAdminOnly>
+                <SuperAdmin />
               </ProtectedRoute>
+            } />
+            <Route path="/stock" element={
+              <ProtectedRoute module="stock"><Stock /></ProtectedRoute>
             } />
             <Route path="/billing" element={
-              <ProtectedRoute module="billing">
-                <Billing />
-              </ProtectedRoute>
+              <ProtectedRoute module="billing"><Billing /></ProtectedRoute>
             } />
             <Route path="/dashboard" element={
-              <ProtectedRoute module="dashboard">
-                <Dashboard />
-              </ProtectedRoute>
+              <ProtectedRoute module="dashboard"><Dashboard /></ProtectedRoute>
             } />
             <Route path="/customers" element={
-              <ProtectedRoute module="customers">
-                <Customers />
-              </ProtectedRoute>
+              <ProtectedRoute module="customers"><Customers /></ProtectedRoute>
             } />
             <Route path="/loyalty" element={
-              <ProtectedRoute module="loyalty">
-                <Loyalty />
-              </ProtectedRoute>
+              <ProtectedRoute module="loyalty"><Loyalty /></ProtectedRoute>
             } />
             <Route path="/accounting" element={
-              <ProtectedRoute module="accounting">
-                <Accounting />
-              </ProtectedRoute>
+              <ProtectedRoute module="accounting"><Accounting /></ProtectedRoute>
             } />
             <Route path="/integrations" element={
-              <ProtectedRoute module="integrations">
-                <Integrations />
-              </ProtectedRoute>
+              <ProtectedRoute module="integrations"><Integrations /></ProtectedRoute>
             } />
             <Route path="/settings" element={
-              <ProtectedRoute module="settings">
-                <Settings />
-              </ProtectedRoute>
+              <ProtectedRoute module="settings"><Settings /></ProtectedRoute>
             } />
             <Route path="/users" element={
-              <ProtectedRoute module="users">
-                <Users />
-              </ProtectedRoute>
+              <ProtectedRoute module="users"><Users /></ProtectedRoute>
             } />
             <Route path="/activity" element={
-              <ProtectedRoute module="dashboard">
-                <ActivityLogs />
-              </ProtectedRoute>
+              <ProtectedRoute module="dashboard"><ActivityLogs /></ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
           </Routes>
