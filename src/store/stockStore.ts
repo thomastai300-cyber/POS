@@ -16,6 +16,18 @@ interface StockStore {
   getSalesByDateRange: (from: Date, to: Date) => Sale[];
 }
 
+const getBusinessId = async (): Promise<string | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from('business_members')
+    .select('business_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+  return data?.business_id || null;
+};
+
 const mapDbToStockItem = (row: any): StockItem => ({
   id: row.id,
   barcode: row.barcode,
@@ -109,10 +121,13 @@ export const useStockStore = create<StockStore>()((set, get) => ({
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
 
+    const bizId = await getBusinessId();
+
     const { data, error } = await supabase
       .from('stock_items')
       .insert({
         user_id: userData.user.id,
+        business_id: bizId,
         barcode: item.barcode,
         name: item.name,
         category: item.category,
@@ -184,10 +199,13 @@ export const useStockStore = create<StockStore>()((set, get) => ({
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Not authenticated');
 
+    const bizId = await getBusinessId();
+
     const { data: saleData, error: saleError } = await supabase
       .from('sales')
       .insert({
         user_id: userData.user.id,
+        business_id: bizId,
         timestamp: sale.timestamp,
         date: sale.date,
         customer_id: sale.customerId || null,
@@ -211,11 +229,11 @@ export const useStockStore = create<StockStore>()((set, get) => ({
 
     if (saleError || !saleData) throw new Error(saleError?.message || 'Failed to create sale');
 
-    // Insert sale items
     if (sale.items.length > 0) {
       await supabase.from('sale_items').insert(
         sale.items.map((si) => ({
           sale_id: saleData.id,
+          business_id: bizId,
           item_id: si.itemId,
           name: si.name,
           quantity: si.quantity,
@@ -225,7 +243,6 @@ export const useStockStore = create<StockStore>()((set, get) => ({
       );
     }
 
-    // Deduct stock quantities
     for (const si of sale.items) {
       const currentItem = get().items.find(i => i.id === si.itemId);
       if (currentItem) {
@@ -238,7 +255,6 @@ export const useStockStore = create<StockStore>()((set, get) => ({
 
     const newSale = mapDbToSale(saleData, sale.items);
 
-    // Update local state
     set((state) => ({
       sales: [newSale, ...state.sales],
       items: state.items.map((item) => {
