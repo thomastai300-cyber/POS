@@ -26,6 +26,7 @@ const managementNavLinks = [
 ];
 
 const systemNavLinks = [
+  { name: 'Business', path: '/business-profile', icon: Building2, module: 'settings' },
   { name: 'Users', path: '/users', icon: Users, module: 'users' },
   { name: 'Integrations', path: '/integrations', icon: Plug, module: 'integrations' },
   { name: 'Settings', path: '/settings', icon: Settings, module: 'settings' },
