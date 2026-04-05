@@ -18,6 +18,7 @@ import ActivityLogs from "./pages/ActivityLogs";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import SuperAdmin from "./pages/SuperAdmin";
+import BusinessProfile from "./pages/BusinessProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,9 @@ const App = () => (
             } />
             <Route path="/activity" element={
               <ProtectedRoute module="dashboard"><ActivityLogs /></ProtectedRoute>
+            } />
+            <Route path="/business-profile" element={
+              <ProtectedRoute module="settings"><BusinessProfile /></ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
           </Routes>
