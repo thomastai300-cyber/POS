@@ -14,8 +14,11 @@ import {
   Award,
   User,
   Smartphone,
-  Banknote
+  Banknote,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +56,8 @@ export function POSSystem() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState('');
-  
+  const [aiSearching, setAiSearching] = useState(false);
+  const [aiResults, setAiResults] = useState<string[] | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const { items, addSale, fetchItems } = useStockStore();
   const { customers, recordPurchase, addLoyaltyPoints } = useCustomerStore();
@@ -82,7 +86,32 @@ export function POSSystem() {
 
   useBarcodeScanner({ onScan: handleBarcodeScan });
 
+  const handleAiSearch = useCallback(async (query: string) => {
+    if (!query || query.length < 3 || items.length === 0) {
+      setAiResults(null);
+      return;
+    }
+    setAiSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-product-search', {
+        body: { 
+          query, 
+          products: items.map(i => ({ id: i.id, name: i.name, category: i.category, price: i.price, barcode: i.barcode }))
+        }
+      });
+      if (error) throw error;
+      setAiResults(data?.product_ids || []);
+    } catch {
+      setAiResults(null);
+    } finally {
+      setAiSearching(false);
+    }
+  }, [items]);
+
   const filteredItems = useMemo(() => {
+    if (aiResults !== null) {
+      return aiResults.map(id => items.find(i => i.id === id)).filter(Boolean) as typeof items;
+    }
     if (!searchTerm) return items;
     const lower = searchTerm.toLowerCase();
     return items.filter(
@@ -90,7 +119,7 @@ export function POSSystem() {
         item.name.toLowerCase().includes(lower) ||
         item.barcode.toLowerCase().includes(lower)
     );
-  }, [items, searchTerm]);
+  }, [items, searchTerm, aiResults]);
 
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.total, 0);
