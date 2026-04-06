@@ -14,8 +14,11 @@ import {
   Award,
   User,
   Smartphone,
-  Banknote
+  Banknote,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +56,8 @@ export function POSSystem() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
   const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState('');
-  
+  const [aiSearching, setAiSearching] = useState(false);
+  const [aiResults, setAiResults] = useState<string[] | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const { items, addSale, fetchItems } = useStockStore();
   const { customers, recordPurchase, addLoyaltyPoints } = useCustomerStore();
@@ -82,7 +86,32 @@ export function POSSystem() {
 
   useBarcodeScanner({ onScan: handleBarcodeScan });
 
+  const handleAiSearch = useCallback(async (query: string) => {
+    if (!query || query.length < 3 || items.length === 0) {
+      setAiResults(null);
+      return;
+    }
+    setAiSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-product-search', {
+        body: { 
+          query, 
+          products: items.map(i => ({ id: i.id, name: i.name, category: i.category, price: i.price, barcode: i.barcode }))
+        }
+      });
+      if (error) throw error;
+      setAiResults(data?.product_ids || []);
+    } catch {
+      setAiResults(null);
+    } finally {
+      setAiSearching(false);
+    }
+  }, [items]);
+
   const filteredItems = useMemo(() => {
+    if (aiResults !== null) {
+      return aiResults.map(id => items.find(i => i.id === id)).filter(Boolean) as typeof items;
+    }
     if (!searchTerm) return items;
     const lower = searchTerm.toLowerCase();
     return items.filter(
@@ -90,7 +119,7 @@ export function POSSystem() {
         item.name.toLowerCase().includes(lower) ||
         item.barcode.toLowerCase().includes(lower)
     );
-  }, [items, searchTerm]);
+  }, [items, searchTerm, aiResults]);
 
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.total, 0);
@@ -376,15 +405,45 @@ export function POSSystem() {
               </div>
             </div>
 
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search or scan barcode..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-background border-input"
-              />
+            <div className="flex gap-2 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search or scan barcode..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    if (!e.target.value) setAiResults(null);
+                  }}
+                  className="pl-10 bg-background border-input"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className={`shrink-0 ${aiResults !== null ? 'bg-primary text-primary-foreground' : ''}`}
+                disabled={aiSearching || !searchTerm}
+                onClick={() => {
+                  if (aiResults !== null) {
+                    setAiResults(null);
+                  } else {
+                    handleAiSearch(searchTerm);
+                  }
+                }}
+                title="AI Smart Search"
+              >
+                {aiSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              </Button>
             </div>
+            {aiResults !== null && (
+              <div className="flex items-center gap-2 mb-3 text-xs text-primary">
+                <Sparkles className="w-3 h-3" />
+                <span>AI found {aiResults.length} matching product{aiResults.length !== 1 ? 's' : ''}</span>
+                <button onClick={() => setAiResults(null)} className="ml-auto text-muted-foreground hover:text-foreground">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
             {items.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
