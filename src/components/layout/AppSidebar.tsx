@@ -1,4 +1,4 @@
-import { Building2, Store, FileText, Package, BarChart3, Settings, Users, Gift, Calculator, Plug, LogOut, User, Activity, Shield } from 'lucide-react';
+import { Building2, Store, FileText, Package, BarChart3, Settings, Users, Gift, Calculator, Plug, LogOut, User, Activity, Shield, FileSpreadsheet } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ const mainNavLinks = [
 
 const managementNavLinks = [
   { name: 'Dashboard', path: '/dashboard', icon: BarChart3, module: 'dashboard' },
+  { name: 'Sales Reports', path: '/sales-reports', icon: FileSpreadsheet, module: 'dashboard' },
   { name: 'Accounting', path: '/accounting', icon: Calculator, module: 'accounting' },
   { name: 'Activity', path: '/activity', icon: Activity, module: 'dashboard' },
 ];
