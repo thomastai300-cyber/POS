@@ -19,6 +19,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import SuperAdmin from "./pages/SuperAdmin";
 import BusinessProfile from "./pages/BusinessProfile";
+import SalesReports from "./pages/SalesReports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,6 +72,9 @@ const App = () => (
             } />
             <Route path="/business-profile" element={
               <ProtectedRoute module="settings"><BusinessProfile /></ProtectedRoute>
+            } />
+            <Route path="/sales-reports" element={
+              <ProtectedRoute module="dashboard"><SalesReports /></ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
           </Routes>
