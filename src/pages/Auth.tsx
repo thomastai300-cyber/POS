@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Lock, User, Loader2, Phone, MapPin, ArrowLeft, Shield } from 'lucide-react';
+import { Building2, Mail, Lock, User, Loader2, Phone, MapPin, ArrowLeft, Shield } from 'lucide-react';
 import logoImg from '@/assets/logo.png';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
