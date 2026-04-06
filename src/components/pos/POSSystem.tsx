@@ -405,15 +405,45 @@ export function POSSystem() {
               </div>
             </div>
 
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search or scan barcode..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-background border-input"
-              />
+            <div className="flex gap-2 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search or scan barcode..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    if (!e.target.value) setAiResults(null);
+                  }}
+                  className="pl-10 bg-background border-input"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className={`shrink-0 ${aiResults !== null ? 'bg-primary text-primary-foreground' : ''}`}
+                disabled={aiSearching || !searchTerm}
+                onClick={() => {
+                  if (aiResults !== null) {
+                    setAiResults(null);
+                  } else {
+                    handleAiSearch(searchTerm);
+                  }
+                }}
+                title="AI Smart Search"
+              >
+                {aiSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              </Button>
             </div>
+            {aiResults !== null && (
+              <div className="flex items-center gap-2 mb-3 text-xs text-primary">
+                <Sparkles className="w-3 h-3" />
+                <span>AI found {aiResults.length} matching product{aiResults.length !== 1 ? 's' : ''}</span>
+                <button onClick={() => setAiResults(null)} className="ml-auto text-muted-foreground hover:text-foreground">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
             {items.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
